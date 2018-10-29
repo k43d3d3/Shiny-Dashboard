@@ -1,0 +1,218 @@
+---
+title: "Shiny Dashboard II How-To"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This document is intended to guide you through the process of customizing and making dynamic a shiny dashboard. Details on how to build a basic shiny dashboard are not covered in this document. Instructions for building a basic shiny dashboard are covered in the document "Shiny Dashboard I How-To". This document is intended to build on the Shiny Dashboard I example.   
+  
+Specifically, this document will provide instruction on the following:  
+  
+* Creating a **dynamic message menu** that relies on a data file
+* Creating a **dynamic notification menu** that relies on a data file
+* Creating a **dynamic Sidebar menu** with **menuSubItems**  
+* Creating **dynamic InfoBoxes** in the Dashboard Body  
+
+
+
+## Initial Steps
+
+First, open a new R Markdown file and select 'Shiny Document' for the output (Shiny > Shiny Document).
+
+Next, access both the **shiny** and **shinydashboard** packages.
+
+
+## Dynamic Message Menus
+
+In the Shiny Dashboard I example, we built a **static message menu** by inputting the message information directly into the ui script. 
+
+For most purposes, a **dynamic message menu** will be more useful than a static menu. A dynamic message menu differs from a static menu in that it relies on a data set (in this case, a csv file). To function properly, the data set must contain two columns of information: "from" and "message".
+  
+Let's first take a look at the ui script
+
+# Dynamic Message Menus: ui script
+
+```{r}
+ui <- dashboardPage(skin = "black",
+  dashboardHeader(title = "Dashboard",
+                  dropdownMenuOutput("msgOutput"))
+  )
+```
+
+The ui script for a dynamic message menu is quite simple, as shown above. This menu is generated on the ui side with the simple dropdownMenuOutput function. The only argument is the outputId ("msgOutput", in this case). This outputId argument is referenced in the server script, as we will see next.
+
+# Dynamic Message Menus: server script
+
+```{r}
+server <- function(input, output) {
+
+  output$msgOutput <- renderMenu({
+    msgs <- apply(read.csv("MessageData.csv"), 1, function(row) {
+      messageItem(from = row[["From"]], message = row[["Message"]])})
+    
+    dropdownMenu(type = "messages", .list = msgs)})
+}
+```
+
+The server script for a dynamic message menu is a bit more complex. In essence, we are generating a dynamic menu using the renderMenu({}) function. The functions contained within the renderMenu({}) function are listed below:  
+  
+* **apply()**: this enables quick operation (in this case, applied to a row). This function takes three arguments: (variable, margin, function). In this case, the variable is the messages dataset and the margin of 1 tells the function to iterate the function by each row. The function() will be discussed next.    
+      
+* **function(row)**: this enables the use of the function by each row. In this example, we are applying the messageItem() function along each row.    
+    
+* **messageItem()**: this reads each message contained in the messages dataset. Within this function, we specify where to obtain the 'from' and 'message' information. Note that the values within "" must match the column names in the dataset (it is case-sensitive).    
+    
+* **.list = **: this 'sends' (or lists) all messages in the dataset at once.
+
+## Dynamic Notification Menus
+
+Just as is the case with message menus, it will often be more useful to enable dynamic notification menus. Luckily, the script for a dynamic notification menu is very similar to that of the dynamic message menu. Let's start by looking at the ui script. 
+
+# Dynamic Notification Menus: ui script
+
+Just as with the message menus, the ui script for a dynamic notifications menu is quite simple. Simply replace the dropdownMenu function with the dropdownMenuOutput function. Specify the outputId, which will be referenced in the server script (in this case, the outputId is "notsOutput").
+
+```{r}
+dashboardPage(skin = "black",
+  dashboardHeader(title = "Recreation Unlimited Dashboard",
+                  dropdownMenuOutput("notsOutput")
+                  ))
+```
+
+# Dynamic Notification Menus: server script 
+
+The server script for a dynamic notification menu follows the same format as a dynamic message menu. In essence, we are going to create separate outputs for each type of menu (one for the message menu and one for the notification menu).
+
+```{r}
+output$notsOutput <- renderMenu({
+  nots <- apply(read.csv("NotificationData.csv"), 1, function(row) {
+      notificationItem(text = row[["Message"]])
+})
+})
+```
+
+Note that in this case there is only one row of information ("Message"). 
+
+## Dynamic Sidebar with Menu SubItems
+
+It is also possible to render a dynamic sidebar. This will show the user what menu item they selected. Within this dynamic sidebar, we will also add a few menu subitems to the 'Reports' section.
+
+# Dynamic Sidebar: ui script
+```{r}
+dashboardSidebar(
+    sidebarMenuOutput("menu"),
+    textOutput("res"))
+```
+
+The ui script for a dynamic sidebar is quite simple, as shown above. Here, we will replace the sidebarMenu function from the static dashboard example (see Shiny Dashboard I) with a sidebarMenuOutput function and a textOutput function. Note the "menu" and "res" outputIds, which correspond to outputs in the server script (see below). 
+
+# server script 
+```{r}
+server <- function(input, output) {
+  
+  output$res <- renderText({
+  paste0("You've selected:", input$tabs)})
+
+output$menu <- renderMenu({
+  sidebarMenu(id = "tabs",
+              menuItem("Home",
+                       tabName = "home",
+                       icon = icon("home")),
+              menuItem("Reports",
+                       icon = icon("th")))})
+}
+```
+
+Note the two separate outputs, output$res and output$menu. These correspond with the outputIds in the ui script. 
+
+# Sidebar menuSubItems  
+
+Adding menu subitems to a shiny dashboard sidebar is quite simple and only requires modification of the server script as follows:
+
+```{r}
+output$menu <- renderMenu({
+  sidebarMenu(id = "tabs",
+              menuItem("Home",
+                       tabName = "home",
+                       icon = icon("home")),
+              menuItem("Reports",
+                       icon = icon("th"),
+                       menuSubItem('Performance Management',
+                                   tabName = 'pm',
+                                   icon = icon('star')),
+                       menuSubItem('Training',
+                                   tabName = 'training',
+                                   icon = icon('cogs'))))})
+```
+
+To add menusubItems, simply add a menuSubItem function within the menuItem function. In this example, we have two menuSubItems, "Performance Management" and "Training". 
+
+## Dynamic infoBoxes 
+
+It is often more useful to have dynamic (rather than static) infoBoxes. Let's first examine the ui script for building dynamic infoBoxes.
+
+# Dynamic infoBoxes: ui script
+
+```{r}
+dashboardBody(
+  uiOutput("salesBox"),
+  uiOutput("BarsBox")
+)
+```
+
+Once again, the ui script for building a dynamic infoBox is quite simple. In this example, we use the uiOutput function twice and specify "salesBox" and "BarsBox" as outputIds. These outputIds will correspond with outputs created in the server script, which we will examine below:
+
+# Dynamic infoBoxes: server script
+
+```{r}
+server <- function(input, output) {
+  output$salesBox <- renderUI({
+    infoBox(
+      "Sales Average $",
+      paste0("$72,338"),
+      icon = icon("industry"),
+      subtitle = "Average employee sales performance",
+      width = 6,
+      color = "blue",
+      fill = TRUE)})
+  
+  output$barsBox <- renderUI({
+    infoBox(
+      "BARS Average",
+      paste0("3.13"),
+      icon = icon("star"),
+      subtitle = "Average employee BARS rating out of 5",
+      width = 6,
+      color = "purple",
+      fill = TRUE)})
+}
+```
+
+The renderUI function renders reactive HTML. The expressions within renderUI in this example are the salesbox and barsbox, which are also in the ui script as outputIds. The arguments within the infoBox function are rather straight-forward, including title, value, icon, subtitle, width, color and fill arguments.  
+  
+# Boxes for Plots  
+
+This shiny dashboard does not contain any rendered plots (these will be included in the next document, 'Shiny Dashboard III'). However, let's create a few boxes within the dashboard's body in which to later store plots. We'll add three boxes total: Employee Age Distribution, Employee Race Composition, and Training Outcome.  
+
+```{r}
+# Add Employee Age Distribution and Employee Race Composition boxes to the Home Tab
+tabItem(tabName = "home",
+              h2("Home"),
+              fluidRow(
+                box("Employee Age Distribution"),
+                box("Employee Race Composition")))
+
+# Add Training Outcome box to the Training Tab
+tabItem(tabName = "training",
+              h2("Training"),
+              fluidRow(
+                box("Training Outcome")))
+```  
+  
+As mentioned, we'll insert plot outputs into these boxes in the next dashboard. We'll also adjust various elements of these boxes, such as width. 

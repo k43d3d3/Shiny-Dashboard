@@ -1,0 +1,195 @@
+---
+title: "Shiny Dashboard IV How-To"
+runtime: shiny
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction  
+  
+The purpose of this document is to provide instruction on Shiny Dashboard customization. This document is intended to build upon previous Dashboard How-To documents and also relies on csv files. Specifically, this document will provide guidance on the following:  
+* Organizing the ui script  
+* Adding Pie charts to visualize employee demographic information  
+* Adding a value box to display numeric information  
+
+## Intial Steps  
+  
+First, open a new document and ensure that you choose "Shiny Document" as the output.   
+Next, ensure that all necessary packages are installed and accessed. Necessary packages include **shiny**, **shinydashboard**, **plotly**, **lessR**, and **plyr**. 
+
+Finally, ensure you have the following files downloaded and in the appropriate file folder:  
+* TrainingData.csv  
+* SurveyData.csv  
+* PerformanceData.csv  
+* PersonalData.csv  
+* MessageData.csv  
+* NotificationData.csv  
+
+## Organizing the ui Script  
+
+To better-organize the ui script for our shiny dashboard, let's first piece apart the different functions. Recall the layout of a shiny dashboard's ui script:  
+
+```{r}
+ui <- dashboardPage(skin = "blue",
+                    dashboardHeader(),
+                    dashboardSidebar(),
+                    dashboardBody())
+```  
+  
+The functions above contain all other subsequent functions for the ui script. It is possible to better-organize the functions within the ui script, as follows:  
+
+```{r}
+header <- dashboardHeader()
+
+sidebar <- dashboardSidebar()
+
+body <- dashboardBody()
+```
+  
+We will then reference these objects in the dashboardPage() function, which is nested in the shinyApp() function. The ShinyApp() function is the very last function in our shiny dashboard script. The following is the script for these functions:   
+
+```{r}
+shinyApp(ui = dashboardPage(skin = "blue", header, sidebar), server)
+```
+
+Remember to nest the objects within the dashboardPage() function. This is necessary for rendering shiny dashboard objects. (Shiny dashboard objects will not render within other functions, such as fillPage().)   
+
+## Rendering Pie Charts with Plotly  
+
+Using the plotly package, let's create some pie charts to visualize employee demographic information. more specifically, we will visualize the composition of employee race, ethnicity, disability status, and veteran status. We will use the csv file PersonalData.csv to generate these plots.  
+  
+### Pie Chart: Employee Race  
+
+To render a pie chart using the plotly package, we will use the plotlyOutput() and renderPlotly() functions in the ui and server scripts, respectively. First, let's take a look at the ui script for this pie chart.  
+  
+``` {r}
+body <- dashboardBody(
+  tabItems(
+    tabName = "Home",
+    h2("Employee Demographics Overview"),
+    fluidRow(
+      box("Employee Race Composition", width = 6,
+          plotlyOutput("racePie", height = 250,
+                       width = 300)))))
+```
+
+Note that within the plotlyOutput function, we first name the plot in double quotes. This name will be referenced in the server script with output$racePie. Note also that we specify width and height arguments. Let's now look at the server script for this plot.    
+  
+```{r}
+server <- function (input, output, session) {
+  
+  # Read in csv file(s)
+  persdata <- read.csv("PersonalData.csv")
+  
+  output$racePie <- renderPlotly({
+    plot_ly(data = persdata, labels = ~Race, values = ~EmployeeID, type = "pie")})
+}
+```  
+  
+Note that we reference the pie chart with output$racePie and render a plotly output with the renderPlotly({}) and plot_ly() functions. We specify which dataframe to access with the data = argument, and specify labels and values as Race and EmployeeID, respectively. The labels = argument sets the label names for the chart, while the values = argument will set the numerical values for each label of the chart. In this example, the labels are based on the different Race variables (Asian, Black, and White), while the values are based on the number of unique EmployeeIDs per label (we use the unique EmployeeID to determine the values).  
+  
+### Pie Charts: Ethnicity, Disability Status, and Veteran Status  
+
+Now that we have covered the basic layout of a pie chart using the plotly package, let's create the rest of the pie charts listed earlier in this document.  
+  
+```{r}
+# ui Script 
+
+body <- dashboardBody(
+  tabItems(
+    tabName = "Home",
+    h2("Employee Demographics Overview"),
+    fluidRow(
+      box("Employee Race Composition", width = 6,
+          plotlyOutput("racePie", height = 250,
+                       width = 300)),
+      box("Employee Ethnicity Composition", width = 6,
+                  plotlyOutput("ethPie", height = 250, 
+                               width = 300))),
+    fluidRow(
+      box("Employee Disability Status", width = 6,
+                  plotlyOutput("disPie", height = 250, 
+                               width = 300)),
+      box("Employee Veteran Status", width = 6,
+                  plotlyOutput("vetPie", height = 250,
+                               width = 300)))))
+
+# server Script
+
+server <- function(input, output, session) {
+  
+  # dashboardBody Outputs (by Tab)
+  
+  ## Home Tab
+  
+  output$racePie <- renderPlotly({
+    
+    # Create Pie chart based on employee Race
+    plot_ly(data = persdata, labels = ~Race, values = ~EmployeeID, type = "pie")})
+  
+  output$ethPie <- renderPlotly({
+    
+    # Create Pie chart based on employee Ethnicity
+    plot_ly(data = persdata, labels = ~Ethnicity, values = ~EmployeeID, type = "pie")})
+  
+  output$disPie <- renderPlotly({
+    
+    # Create Pie chart based on employee Disability status
+    plot_ly(data = persdata, labels = ~Disability, values = ~EmployeeID, type = "pie")})
+  
+  output$vetPie <- renderPlotly({
+    
+    # Create Pie chart based on employee Veteran status
+    plot_ly(data = persdata, labels = ~Disability, values = ~EmployeeID, type = "pie")})
+}
+```
+  
+## Rendering a Dynamic Value Box    
+  
+Let's add more information about employee Age to the Home tab of our dashboard. Specifically, let's add a value box to show the percentage of employees above the age of 35.  
+  
+To calculate this percentage, we must filter persdata for employees over 35.0 years of age. To do so, we will use the subset() and count() functions. To render a value box, we will use the valueBoxOutput() and renderValueBox({}) functions in the ui and server scripts, respectively.    
+  
+```{r}
+# ui Script
+
+body <- dashboardBody(
+  tabItems(
+    tabItem(tabName = "Home",
+            h2("Employee Demographics Overview"),
+            fluidRow(
+              box("Employee Age Distribution", width = 8,
+                    plotlyOutput("ageHist", height = 250, 
+                                 width = 400)),
+              valueBoxOutput("ageBox")))))
+
+# server Script
+
+server <- function(input, output, session) {
+  
+  # dashboardBody Outputs (by Tab)
+  
+  ## Home Tab
+  
+  output$ageBox <- renderValueBox({
+  
+  # Filter persdata for employees over the age of 35.0
+  persfilter <- subset(persdata, Age>="35.0")
+  
+  # Count the number of employees over the age of 35.0
+  count(persfilter, vars = "EmployeeID") # Number of employees over 35.0: 195
+  
+  # Count the number of total employees
+  count(persdata, vars = "EmployeeID") # Number of total employees: 521
+  
+  # Compute the percentage of employees over the age of 35.0
+  195/521 # .3742802
+  
+  valueBox(paste0("37.4%"), "Employees over 35", icon = icon("badge-percent"),  
+           color = "blue")})
+}
+
+```

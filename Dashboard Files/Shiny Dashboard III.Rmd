@@ -1,0 +1,214 @@
+---
+title: "Shiny Dashboard III"
+runtime: shiny
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+``` {r, echo = FALSE, warning = FALSE, message = FALSE}
+# app.R (single-file Shiny App)
+
+# Access the necessary packages
+library(shiny)
+library(shinydashboard)
+library(plotly)
+library(lessR)
+
+# User Interface Script
+ui <- dashboardPage(skin = "blue",
+  dashboardHeader(title = "Recreation Unlimited Dashboard",
+                  dropdownMenuOutput("msgOutput"),
+                  dropdownMenuOutput("notsOutput")),
+                       
+  dashboardSidebar(
+    sidebarMenuOutput("menu"),
+    textOutput("res")),
+
+   dashboardBody(
+    tabItems(
+      tabItem(tabName = "Home",
+              h2("Home"),
+              fluidRow(
+                box("Employee Age Distribution", width = 6,
+                    plotlyOutput("ageHist", height = 250, 
+                                 width = 300)),
+                box("Employee Race Composition", width = 6)),
+              fluidRow(
+                h3("Employee Survey Results"),
+                tabBox(id = "SurveyPlots", 
+                       selected = "Job Satisfaction", 
+                       width = 10, side = "right",
+                  tabPanel("Job Satisfaction",
+                      plotlyOutput("JSPlot", height = 250, 
+                                   width = 500)),
+                  tabPanel("Employee Engagement",
+                      plotlyOutput("ENGPlot", height = 250,
+                                   width = 500)),
+                  tabPanel(title = "Turnover Intentions",
+                    plotlyOutput("TIPlot", height = 250, 
+                                 width = 500))))),
+              
+      tabItem(tabName = "PM",
+              h2("Performance Management"),
+              fluidRow(
+                h3("Performance Management KPIs"),
+                uiOutput("salesBox"),
+                uiOutput("barsBox")),
+              fluidRow(
+                h3("Sales and Survey Results"),
+                tabBox(id = "ScatterPlots",
+                       width = 10, side = "right",
+                  tabPanel(title = "Sales and Job Satisfaction",
+                           plotlyOutput("JSScatter", 
+                                        height = 250, 
+                                        width = 500)),
+                  tabPanel(title = "Sales and Engagement", 
+                           plotlyOutput("ENGScatter",
+                                        height = 250,
+                                        width = 500)),
+                  tabPanel(title = "Sales and Turnover Intentions",
+                           plotlyOutput("TIScatter",
+                                        height = 250,
+                                        width = 500))
+              )
+              )),
+      
+      tabItem(tabName = "Training",
+              h2("Training"),
+              fluidRow(
+                h3("Training: Old vs New"),
+                plotlyOutput("Tplot", height = 250)))
+      )))
+
+# Server Script
+
+server <- function(input, output, session) {
+  
+  # Read in SurveyData.csv and PerformanceData.csv
+  surveydata <- read.csv("SurveyData.csv")
+  pmdata <- read.csv("PerformanceData.csv")
+  
+  # Merge surveydata and pmdata
+  mergeddata <- merge(surveydata, pmdata, by = c("EmployeeID"), all.x = TRUE)
+
+output$msgOutput <- renderMenu({
+  msgs <- apply(read.csv("MessageData.csv"), 1, function(row) {
+    messageItem(from = row[["From"]], message = row[["Message"]])})
+  dropdownMenu(type = "messages", .list = msgs)})
+  
+output$notsOutput <- renderMenu({
+  nots <- apply(read.csv("NotificationData.csv"), 1, function(row) {
+    notificationItem(text = row[["Message"]])})
+  dropdownMenu(type = "notifications", .list = nots)})
+
+output$res <- renderText({
+  paste0("You've selected: ", input$tabs)})
+
+output$menu <- renderMenu({
+  sidebarMenu(id = "tabs",
+              menuItem("Home",
+                       tabName = 'Home',
+                       icon = icon('home')),
+              menuItem("Performance Management",
+                       tabName = 'PM',
+                       icon = icon('star')),
+              menuItem("Training",
+                       tabName = 'Training',
+                       icon = icon('cogs')))})
+    
+  output$salesBox <- renderUI({
+    infoBox(
+      "Sales Average $",
+      paste0("$72,338"),
+      subtitle = "Average employee sales",
+      icon = icon("industry"),
+      width = 6,
+      fill = TRUE)})
+  
+  output$barsBox <- renderUI({
+    infoBox(
+      "BARS Average",
+      paste0("3.13"),
+      subtitle = "Average employee BARS rating",
+      icon = icon("star"),
+      width = 6,
+      fill = TRUE)})
+  
+  output$Tplot <- renderPlotly({
+    
+    # Read in Training Data
+    tdata <- read.csv("TrainingData.csv")
+    
+    # Create Difference Variable
+    tdata$Difference = tdata$PostTest - tdata$PreTest
+    
+    means <- tapply(tdata$Difference, tdata$Group, mean)
+    
+    plot_ly(data = tdata, x = ~Group, y = ~Difference, type = "bar")})
+  
+  output$JSPlot <- renderPlotly({
+    
+    # Create JS Scale Score
+    mergeddata$JS_Scale <- rowMeans(mergeddata[,c("JobSat1", "JobSat2", 
+                                                  "JobSat3")], na.rm = TRUE)
+    
+    # Create JSPlot
+    plot_ly(data = mergeddata, x = ~JS_Scale, type = "histogram")})
+  
+  output$ENGPlot <- renderPlotly({
+    
+    # Create ENG Scale Score
+    mergeddata$ENG_Scale <- rowMeans(mergeddata[,c("Engage2", "Engage3")], na.rm = TRUE)
+    
+    # Create ENGPlot
+    plot_ly(data = mergeddata, x = ~ENG_Scale, type = "histogram")})
+  
+  output$TIPlot <- renderPlotly({
+    
+    # Create TI Scale Score
+    mergeddata$TI_Scale <- rowMeans(mergeddata[,c("TurnoverInt1", "TurnoverInt2",
+                                                  "TurnoverInt3")], na.rm = TRUE)
+    
+    # Create TIPlot
+    plot_ly(data = mergeddata, x = ~TI_Scale, type = "histogram")})
+  
+  output$ageHist <- renderPlotly({
+    
+    # Read in Personal Data
+    persdata <- read.csv("PersonalData.csv")
+    
+    # Create Histogram displaying employee Age
+    plot_ly(data = persdata, x = ~Age, type = "histogram")})
+  
+output$JSScatter <- renderPlotly({
+    
+    # Create JS Scale Score
+    mergeddata$JS_Scale <- rowMeans(mergeddata[,c("JobSat1", "JobSat2", "JobSat3")], na.rm = TRUE)
+    
+    # Create Sales-Job Satisfaction Scatter Plot
+    plot_ly(data = mergeddata, x = ~JS_Scale, y = ~Sales, type = "scatter")})
+
+output$ENGScatter <- renderPlotly({
+    
+    # Create ENG Scale Score
+    mergeddata$ENG_Scale <- rowMeans(mergeddata[,c("Engage2", "Engage3")], na.rm = TRUE)
+    
+    # Create ENG_Scale-Sales Scatter Plot
+    plot_ly(data = mergeddata, x = ~ENG_Scale, y = ~ Sales, type = "scatter")})
+
+output$TIScatter <- renderPlotly({
+    
+    # Create TI Scale Score
+    mergeddata$TI_Scale <- rowMeans(mergeddata[,c("TurnoverInt1", "TurnoverInt2",
+                                                  "TurnoverInt3")], na.rm = TRUE)
+    
+    # Create TI_Scale-Sales Scatter Plot
+    plot_ly(data = mergeddata, x = ~TI_Scale, y = ~Sales, type = "scatter")})
+
+  }
+
+shinyApp(ui, server)
+```

@@ -1,0 +1,99 @@
+---
+title: "Shiny Dashboard II"
+runtime: shiny
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+``` {r, echo = FALSE, warning = FALSE, message = FALSE}
+# app.R (single-file Shiny App)
+
+library(shiny)
+library(shinydashboard)
+
+ui <- dashboardPage(skin = "black",
+  dashboardHeader(title = "Recreation Unlimited Dashboard",
+                  dropdownMenuOutput("msgOutput"),
+                  dropdownMenuOutput("notsOutput")),
+                       
+  dashboardSidebar(
+    sidebarMenuOutput("menu"),
+    textOutput("res")),
+
+   dashboardBody(
+    tabItems(
+      tabItem(tabName = "home",
+              h2("Home"),
+              fluidRow(
+                box("Employee Age Distribution"),
+                box("Employee Race Composition"))),
+      
+      tabItem(tabName = "reports"),
+              
+      tabItem(tabName = "pm",
+              h2("Performance Management"),
+              fluidRow(
+                h3("Performance Management KPIs"),
+                uiOutput("salesBox"),
+                uiOutput("barsBox"))),
+      
+      tabItem(tabName = "training",
+              h2("Training"),
+              fluidRow(
+                box("Training Outcome"))))))
+
+server <- function(input, output) {
+
+output$msgOutput <- renderMenu({
+  msgs <- apply(read.csv("MessageData.csv"), 1, function(row) {
+    messageItem(from = row[["From"]], message = row[["Message"]])})
+  
+  dropdownMenu(type = "messages", .list = msgs)})
+  
+output$notsOutput <- renderMenu({
+  nots <- apply(read.csv("NotificationData.csv"), 1, function(row) {
+    notificationItem(text = row[["Message"]])})
+  
+  dropdownMenu(type = "notifications", .list = nots)})
+
+output$res <- renderText({
+  paste0("You've selected:", input$tabs)})
+
+output$menu <- renderMenu({
+  sidebarMenu(id = "tabs",
+              menuItem("Home",
+                       tabName = "home",
+                       icon = icon("home")),
+              menuItem("Reports",
+                       icon = icon("th"),
+                       menuSubItem('Performance Management',
+                                   tabName = 'pm',
+                                   icon = icon('star')),
+                       menuSubItem('Training',
+                                   tabName = 'training',
+                                   icon = icon('cogs'))))})
+    
+  output$salesBox <- renderUI({
+    infoBox(
+      "Sales Average $",
+      paste0("$72,338"),
+      subtitle = "Average employee sales",
+      icon = icon("industry"),
+      width = 6,
+      fill = TRUE)})
+  
+  output$barsBox <- renderUI({
+    infoBox(
+      "BARS Average",
+      paste0("3.13"),
+      subtitle = "Average employee BARS rating",
+      icon = icon("star"),
+      width = 6,
+      fill = TRUE)})
+
+  }
+
+shinyApp(ui, server)
+```

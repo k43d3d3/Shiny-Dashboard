@@ -1,0 +1,255 @@
+---
+title: "Shiny Dashboard Basics"
+author: "Kaleigh Munson"
+date: "July 19, 2018"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+First, open a new R Markdown file and select 'Shiny Document' for the output (Shiny > Shiny Document).
+
+Next, access both the **shiny** and **shinydashboard** packages.
+
+## Dashboard Framework
+
+First, it helps to visualize the layout of the Shiny Dashboard's script. Shiny Applications use ui.R and server.R scripts, which reference one another. These scripts are typically kept in separate files within the same folder. 
+
+In this example, the ui.R and server.R scripts are written and kept in the same file, known as app.R. The ShinyApp() function then uses the ui.R and server.R scripts to generate the Application. The following code chunk lays out the framework for the app.R script:
+
+``` {r, warning = FALSE, message = FALSE}
+# app.R (Single-file Shiny Application)
+
+# First, accessing both the shiny and shinydashboard pacakages is necessary.
+library(shiny)
+library(shinydashboard)
+
+ui <- dashboardPage(
+  dashboardHeader(),
+  dashboardSidebar(),
+  dashboardBody()
+)
+
+server <- function(input, output) {
+}
+
+shinyApp(ui, server)
+```
+
+Note the three main functions within the dashboardPage() function: dashboardHeader(), dashboardSidebar(), and dashboardBody(). These three functions build the user interface of the Dashboard, and we will explore each function separately. 
+
+## Server Script
+
+The server.R script is where the computation occurs. Remember that whatever is produced in the output of the server will be used by the ui.R script to produce the final output with which the users interact. In this example, the output is a histogram plot. 
+
+``` {r}
+server <- function(input, output) {
+  set.seed(122)
+  histdata <- rnorm(500)
+  
+  output$plot1 <- renderPlot({
+    data <- histdata[seq_len(input$slider)]
+    hist(data)
+  })
+}
+```
+
+## Dashboard Body
+
+Next, expand the Body of the Shiny Dashboard. The body is where most of the Dashboard content is stored. More specifically, to build the Dashboard body, we use the dashboardBody() function. This function typically contains the majority of the Dashboard's content.  
+
+Within this function, we will build **rows** and **columns** using the fluidRow() function. Within this function, we will build **boxes**, which are considered the building blocks of 
+a Dashboard's body. Boxes provide structure for a Dashboard and can contain any type of content. In this example, the box contains a plot. 
+
+``` {r}
+dashboardBody(
+    fluidRow(
+      box(plotOutput("plot1", height = 250)),
+      box(
+        title = "Controls",
+        sliderInput("slider", "Observations:",
+                    min = 1, max = 100, value = 50)
+      )
+    )
+  )
+)
+```
+
+
+# Rows and Columns
+
+Defining columns is crucial to avoid formatting issues. The width choices below will produce a box that is twice the size of the input controls to the right (8 versus 4). Eadch row has a width of 12, so the total width of the boxes in each row must equal 12 (for example, a box with a width of 8 plus a box with a width of 4). 
+
+```{r}
+dashboardBody(
+    fluidRow(
+      box(
+        width = 8, 
+        plotOutput("plot1", 
+        height = 250)),
+      box(
+        width = 4,
+        title = "Controls",
+        sliderInput("slider", "Observations:",
+                    min = 1, max = 100, value = 50)
+      )
+    )
+  )
+```
+
+## Sidebar
+
+A sidebar enables quicker and more convenient dashboard navigation. The sidebar contains two elements: tab items and inputs. These can include menu tab items, sliders and text inputs. These elements are added within the dashboardSidebar() function.
+
+Add the following to the dashboardSidebar() and dashboardBody() functions:
+
+```{r}
+ dashboardSidebar(
+    sidebarMenu(
+      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
+      menuItem("Widgets", icon = icon("th"), tabName = "widgets", badgeLabel = "new",
+               badgeColor = "green")))
+
+dashboardBody(
+    tabItems(
+      tabItem(tabName = "dashboard",
+              h2("Dashboard"),     
+    fluidRow(
+      box(width = 8, plotOutput("plot1", height = 250)),
+      box(
+        width = 4,
+        title = "Controls", solidHeader = TRUE,
+        sliderInput("slider", "Observations:",
+                    min = 1, max = 100, value = 50)))),
+      tabItem(tabName = "widgets",
+              h2("Widgets"))))
+```
+
+## Dashboard Header
+
+A Dashboard Header can contain a title, message, notification and/or drop-down task menu. 
+
+```{r}
+dashboardHeader(title = "Dashboard")
+```
+
+## Menus 
+
+Shiny Dashboards allow for three different types of menus: **message menus**, **notification menus**, and **task menus**. Each require different inputs into the dropdownMenu() function, as expained below. To build a drop-down menu, add the relevant code chunks to the dashboardHeader() function. 
+
+# Message Menus
+
+Message menus display messages. The messageItem() function requires both from and message values. This function also allows for the inclusion of a time string, which can be any text (4:00, 15:43 P.M., 2018-09-08, etc.). Finally, this function allows for the inclusion of an icon. (For icon options, please see the second link in the Resources for Customization section.)
+
+```{r}
+dashboardHeader(title = "Dashboard",
+                  dropdownMenu(type = "messages",
+                 messageItem(
+                   from = "Sales Department",
+                   message = "Sales are steady this month."),
+                 messageItem(
+                   from = "Support",
+                   message = "The new server is ready.",
+                   icon = icon("life-ring"),
+                   time = "4:01 P.M.")))
+```
+
+# Notification Menus
+
+```{r}
+dropdownMenu(type = "notifications",
+                 notificationItem(
+                   text = "5 new users today",
+                   icon("users")),
+                 notificationItem(
+                   text = "12 itesm delivered",
+                   icon("truck"),
+                   status = "success"))
+```
+
+# Task Menus
+
+```{r}
+dropdownMenu(type = "tasks", badgeStatus = "success",
+                 taskItem(value = 90, color = "green",
+                          "Documentation"),
+                 taskItem(value = 17, color = "aqua",
+                          "Project X"),
+                 taskItem(value = 75, color = "yellow",
+                          "Server deployment"),
+                 taskItem(value = 80, color = "red",
+                          "Overall project"))
+```
+
+## Resources for Customization
+
+The following is a list of resources to aid in Dashboard customization:
+
+1. Appearance options for Shiny Dashboards (skins, titles, icons, colors, etc.):
+  + [link](http://rstudio.github.io/shinydashboard/appearance.html)
+
+2. Searchable list of icons:
+  + [link](https://fontawesome.com/icons?d=gallery&q=sales)
+
+3. Status and color options:
+  + [link](http://rstudio.github.io/shinydashboard/appearance.html#statuses-and-colors)
+
+## Dashboard Customization
+
+# Boxes -- Titles and Headers
+
+The headers and titles of boxes can be customized using **title** and **status options** (see the status and color options link in the Resources for Customization section above).
+
+Text boxes can also be added with the "textInput()" function. 
+
+```{r}
+  dashboardBody(
+    tabItems(
+      tabItem(tabName = "dashboard",
+              h2("Dashboard"),     
+    fluidRow(
+      box(width = 8, title = "Histogram", status = "primary", 
+          solidHeader = TRUE,
+          plotOutput("plot1", height = 250)),
+      
+      box(width = 4, title = "Controls", status = "info", 
+          solidHeader = TRUE, 
+          sliderInput("slider", "Observations:", 
+                      min = 1, max = 100, value = 50),
+          textInput("text", "Text:")))),
+    
+      tabItem(tabName = "widgets",
+              h2("Widgets"))))
+
+```
+
+Note the placement of the **title**, **status** and **solidHeader parameters** within the box() function. 
+
+# Boxes -- Background Color
+
+It is also possible to set background colors for boxes (as opposed to Header colors). Simply remove the **status parameter** and add a **background parameter** to the box() function. (See the status and color options link in the Resources for Customization section above.) 
+
+```{r}
+ dashboardBody(
+    tabItems(
+      tabItem(tabName = "dashboard",
+              h2("Dashboard"),     
+    fluidRow(
+      box(width = 8, title = "Histogram", background = "maroon",
+          solidHeader = TRUE,
+          plotOutput("plot1", height = 250)),
+      
+      box(width = 4, title = "Controls", status = "info", 
+          solidHeader = TRUE, 
+          sliderInput("slider", "Observations:", 
+                      min = 1, max = 100, value = 50),
+          textInput("text", "Text:")))),
+    
+      tabItem(tabName = "widgets",
+              h2("Widgets"))))
+```

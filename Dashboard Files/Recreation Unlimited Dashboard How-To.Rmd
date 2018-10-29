@@ -1,0 +1,308 @@
+---
+title: "Recreation Unlimited Dashboard How-To"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The purpose of this document is to provide guidance on building a dynamic shiny dashboard. This document builds on other documents and relies on various csv files and packages, as will be listed below.  
+  
+The following documents precede this one and contain instructions on how to build different versions of a shiny dashboard. Please see the following shiny dashboard versions and their corresponding instructional (How-To) files: Shiny Dashboard I, Shiny Dashboard II, Shiny Dashboard III, and Shiny Dashboard IV.  
+
+This document will provide instruction on the following:  
+* Using flex dashboard to change the dashboard's display  
+* Using a pipe operator with plot outputs: adjust legend positions and add axis labels   
+* Inserting multiple outputs into one tab of a tabBox  
+
+
+## Initial Steps   
+
+First, ensure that all necessary packages are downloaded and accessed. Necessary packages include: **shiny**, **shinydashboard**, **plotly**, **lessR**, and **plyr**.  
+Finally, ensure you have the following files downloaded and in the appropriate file folder:    
+* TrainingData.csv    
+* SurveyData.csv    
+* PerformanceData.csv    
+* PersonalData.csv    
+* MessageData.csv    
+* NotificationData.csv  
+
+## Flex Dashboard  
+
+In all previous shiny dashboard versions, the actual dashboard output is quite small and rather unattractive. We can adjust the display of our shiny dashboard by specifying our output as flex_dashboard in our YAML Header (the first four lines of our shiny dashboard document).  
+
+```{r}
+
+### ---
+### title: "Recreation Unlimited Dashboard"
+### output:
+###   flexdashboard::flex_dashboard
+### runtime: shiny
+```
+  
+Note how different the display is when you change the output -- much more enjoyable to navigate.  
+
+## Pipe Operator  
+
+Note in shiny dashboard IV that many of the plots (histograms, bar plots, scatter plots) are missing axis labels. Note also that the legends in the pie charts are awkwardly placed. We can easily change these chart elements using a pipe operator (%>%). Let's adjust the legend's position in the Race Composition pie chart.  
+
+# Pipe Operator: Adjusting Legend Position  
+ 
+To apply piping, we will insert the pipe operator (%>%) at the end of the plot output function. This makes more sense when looking at an example:  
+
+```{r}
+server <- function(input, output, session) {
+  
+  # Home Tab
+  
+  output$racePie <- renderPlotly({
+    
+    # Create Pie chart based on employee Race
+    plot_ly(data = persdata, labels = ~Race, values = ~EmployeeID, type = "pie") %>%
+    
+    # Position the legend inside the plot
+    layout(legend = list(x = -0.1, y = -0.9))})
+  
+}
+```  
+  
+As we can see in the above example, to adjust the legend's layout using piping, we add the pipe operator at the end of the plot_ly function and add a layout() function, specifying the legend's position using 'legend = '. We can now adjust the layout of the other pie charts' legends:  
+
+```{r}
+server <- function(input, output, session) {
+  # Home Tab
+  
+  output$ethPie <- renderPlotly({
+  
+    # Create Pie chart based on employee Ethnicity
+    plot_ly(data = persdata, labels = ~Ethnicity, values = ~EmployeeID, type = "pie") %>%
+  
+    # Position the legend inside the plot 
+    layout(legend = list(x = 1, y = -0.9))})
+  
+  output$disPie <- renderPlotly({
+  
+    # Create Pie chart based on employee Disability status
+    plot_ly(data = persdata, labels = ~Disability, values = ~EmployeeID, type = "pie") %>%
+    
+    # Position the legend inside the plot
+    layout(legend = list(x = -0.1, y = -0.9))})
+
+  output$vetPie <- renderPlotly({
+  
+    # Create Pie chart based on employee Veteran status
+    plot_ly(data = persdata, labels = ~Veteran, values = ~EmployeeID, type = "pie") %>%
+    
+    # Position the legend inside the plot 
+    layout(legend = list(x = 1, y = -0.9))})
+
+  output$employeeSPie <- renderPlotly({
+    
+    # Create pie chart based on employee Sex
+    plot_ly(data = persdata, labels = ~Sex, values = ~EmployeeID, type = "pie") %>%
+    
+    # Position the legend
+    layout(legend = list(x = -0.1, y = -0.9))})
+}
+```
+
+# Pipe Operator: Adding Axis Labels  
+
+Let's use the pipe operator to add axis labels to the histograms, bar plots, and scatter plots. We'll do this by creating x and y axis label variables and passing them through the layout() function.  
+
+```{r}
+server <- function(input, output, session) {
+  
+  ## Home Tab
+  
+  output$ageHist <- renderPlotly({
+    
+    # Create x and y axis titles
+    x <- list(title = "Age")
+    y <- list(title = "Number of Employees")
+    
+    # Create Histogram displaying employee Age
+    plot_ly(data = persdata, x = ~Age, type = "histogram") %>%
+      layout(xaxis = x, yaxis = y)})
+  
+  ## Survey Tab
+  
+  output$JSPlot <- renderPlotly({
+    
+    # Create x and y axis titles
+    x <- list(title = "Job Satisfaction")
+    y <- list(title = "Response Frequency")
+    
+    # Create JS Scale Score
+    mergeddata$JS_Scale <- rowMeans(mergeddata[,c("JobSat1", "JobSat2", 
+                                                  "JobSat3")], na.rm = TRUE)
+    
+    # Create JSPlot
+    plot_ly(data = mergeddata, x = ~JS_Scale, type = "histogram") %>%
+    layout(xaxis = x, yaxis = y)})
+  
+  output$ENGPlot <- renderPlotly({
+  
+    # Create x and y axis titles
+    x <- list(title = "Engagement")
+    y <- list(title = "Response Frequency")
+    
+    # Create ENG Scale Score
+    mergeddata$ENG_Scale <- rowMeans(mergeddata[,c("Engage2", "Engage3")], 
+                                     na.rm = TRUE)
+    
+    # Create ENGPlot
+    plot_ly(data = mergeddata, x = ~ENG_Scale, type = "histogram") %>%
+      layout(xaxis = x, yaxis = y)})
+  
+  output$TIPlot <- renderPlotly({
+  
+    # Create x and y axis titles
+    x <- list(title = "Turnover Intentions")
+    y <- list(title = "Response Frequency")
+    
+    # Create TI Scale Score
+    mergeddata$TI_Scale <- rowMeans(mergeddata[,c("TurnoverInt1", "TurnoverInt2",
+                                                  "TurnoverInt3")], na.rm = TRUE)
+    
+   # Create TIPlot
+    plot_ly(data = mergeddata, x = ~TI_Scale, type = "histogram") %>%
+      layout(xaxis = x, yaxis = y)})
+  
+  ## Performance Management Tab
+  
+  output$salesHist <- renderPlotly({
+  
+    # Create x and y axis titles
+    x <- list(title = "Sales")
+    y <- list(title = "Frequency")
+  
+    # Create histogram based on employee Sales
+    plot_ly(data = mergeddata, x = ~Sales, type = "histogram") %>%
+      layout(xaxis = x, yaxis = y)})
+
+  output$barsHist <- renderPlotly({
+  
+    # Create x and y axis titles 
+    x <- list(title = "BARS Rating")
+    y <- list(title = "Frequency")
+  
+    # Create histogram based on employee BARS Ratings
+    plot_ly(data = mergeddata, x = ~BARSrating, type = "histogram")%>%
+      layout(xaxis = x, yaxis = y)})
+  
+  output$JSScatter <- renderPlotly({
+  
+    # Create x and y axis titles
+    x <- list(title = "Job Satisfaction")
+    y <- list(title = "Sales")
+  
+    # Create JS Scale Score
+    mergeddata$JS_Scale <- rowMeans(mergeddata[,c("JobSat1", "JobSat2", "JobSat3")], na.rm = TRUE)
+  
+    # Create Sales-Job Satisfaction Scatter Plot
+    plot_ly(data = mergeddata, x = ~JS_Scale, y = ~Sales, type = "scatter") %>%
+      layout(xaxis = x, yaxis = y)})
+
+  output$ENGScatter <- renderPlotly({
+  
+    # Create x and y axis titles
+    x <- list(title = "Engagement")
+    y <- list(title = "Sales")
+  
+    # Create ENG Scale Score
+    mergeddata$ENG_Scale <- rowMeans(mergeddata[,c("Engage2", "Engage3")], na.rm = TRUE)
+  
+    # Create ENG_Scale-Sales Scatter Plot
+    plot_ly(data = mergeddata, x = ~ENG_Scale, y = ~ Sales, type = "scatter") %>%
+      layout(xaxis = x, yaxis = y)})
+
+  output$TIScatter <- renderPlotly({
+  
+    # Create x and y axis titles
+    x <- list(title = "Turnover Intentions")
+    y <- list(title = "Sales")
+  
+    # Create TI Scale Score
+    mergeddata$TI_Scale <- rowMeans(mergeddata[,c("TurnoverInt1", "TurnoverInt2",
+                                                  "TurnoverInt3")], na.rm = TRUE)
+    
+    # Create TI_Scale-Sales Scatter Plot
+    plot_ly(data = mergeddata, x = ~TI_Scale, y = ~Sales, type = "scatter") %>%
+      layout(xaxis = x, yaxis = y)})
+}
+
+```  
+  
+## Multiple Outputs in One Tab of a tabBox  
+
+To house multiple outputs in one tab of a tabBox, we will use fluidRow() and column() functions within the tabBox. Let's apply this to the Home tab by grouping the racePie and ethPie together in one tab, and the disPie and vetPie together in another tab. This will all occur in the ui script:   
+  
+```{r}
+body <- dashboardBody(
+  tabItems(
+    tabItem(tabName = "Home",
+            h2("Employee Demographics Overview"),
+            fluidRow(
+              column(width = 10,
+                     box("Employee Age Distribution", width = 6,
+                         plotlyOutput("ageHist", height = 400,
+                                      width = 500)),
+                     valueBoxOutput("ageBox"),
+                     box("Employee Sex Composition", width = 4,
+                         plotlyOutput("employeeSPie", height = 250, 
+                                      width = 300)))),
+            fluidRow(
+              column(width = 10,
+                     tabBox(id = "PieBox", width = 10, side = "left", 
+                            tabPanel(title = "Employee Race and Ethnicity Composition",
+                                     fluidRow(
+                                     column(width = 5,
+                                            h4("Employee Race Composition"),
+                                            plotlyOutput("racePie", height = 300,
+                                                        width = 400)),
+                                     column(width = 4,
+                                            h4("Employee Ethnicity Composition"),
+                                            plotlyOutput("ethPie", height = 300,
+                                                         width = 400)))),
+                            tabPanel(title = "Employee Disability and Veteran Statuses",
+                                     fluidRow(
+                                       column(width = 4, 
+                                              h4("Employee Disability Status"),
+                                              plotlyOutput("disPie", height = 300,
+                                                           width = 500)),
+                                       column(width = 4,
+                                              h4("Employee Veteran Status"),
+                                              plotlyOutput("vetPie", height = 300,
+                                                           width = 400))))))))
+    ))
+```  
+
+Let's now apply this to the Performance Management tab by grouping the salesHist and salesBox together in one tab, and the barsHist and barsBox in another tab.  
+  
+```{r}
+tabItem(tabName = "PM",
+              h2("Performance Management"),
+              fluidRow(
+                h3("Employee Sales and BARS Performance"),
+                tabBox(id = "PM Indicators",
+                       width = 8, side = "left",
+                       tabPanel(title = "Sales Performance",
+                                fluidRow( 
+                                  plotlyOutput("salesHist", height = 300,
+                                               width = 700),
+                                  uiOutput("salesBox"))),
+                       tabPanel(title = "BARS Rating",
+                                fluidRow(
+                                  plotlyOutput("barsHist", height = 300,
+                                               width = 700),
+                                  uiOutput("barsBox")))))
+    )
+```
+  
+## Other New Dashboard Elements  
+
+This final dashboard version features a few new outputs, such as value boxes in the Survey tab that communicate the mean of each survey scale score, as well as an info box and a collapsible box in the Training tab. All of these boxes are explained in previous shiny dashboard How-To documents.  

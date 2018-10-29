@@ -1,0 +1,302 @@
+---
+title: "Shiny Dashboard III How-To"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The purpose of this document is to provide instruction on Shiny Dashboard customization. This document is intended to build upon previous Dashboard How-To documents and also relies on csv files. Specifically, this document will provide guidance on the following:  
+* Creating plot outputs using the plotly package (including histograms, bar charts, pie charts, and scatter plots) 
+* Displaying multiple outputs in a tabbed box  
+
+## Initial Steps
+
+First, open a new document and ensure that you choose "Shiny Document" as the output.   
+Next, ensure that all necessary packages are installed and accessed. Necessary packages include **shiny**, **shinydashboard**, **plotly**, and **lessR**.  
+Finally, ensure you have the following files downloaded and in the appropriate file folder:  
+* TrainingData.csv  
+* SurveyData.csv  
+* PerformanceData.csv  
+* PersonalData.csv
+
+## Plot Outputs using Plotly
+
+Plotly is a package in R that enables visualization of custom plots that can be viewed and modified in a web browser. We will use this package to visualize histograms, bar plots, and scatter plots. 
+
+For more information on the plotly package, see this ebook [link] (https://plotly-book.cpsievert.me/). 
+
+### Plotly Histogram: Age 
+
+Let's begin our exploration of the plotly package by construcuting a histogram based on the distribution of Employee Age (as contained within the csv file PersonalData.csv).  
+
+In this example, we have chosen to contain the histogram output in a box. The following is the ui script for the histogram based on age:  
+
+#### ui Script 
+
+```{r}
+ui <- dashboardPage(skin = "blue",
+                    dashboardHeader(),
+                    dashboardSidebar(),
+                    dashboardBody(tabItems(
+                      tabItem(
+                        tabName = "Home",
+                        h2("Home"),
+                        fluidRow(
+                          box("Employee Age Distribution", width = 6,
+                              plotlyOutput("ageHist", height = 250, width = 500)),
+                          box("Employee Race Composition", width = 6)
+                          )))))
+```
+
+The ui script for a plotly output is quite simple. Note the name of the histogram "ageHist", as this will be referenced in the server script (as shown below). Note that we can set both height and width for the plot as well. 
+
+#### server Script
+
+Because this histogram relies on the csv file PersonalData.csv, we must read it in. We can do this within the renderPlotly function, which references the plotlyOutput function in the ui script to render the specified plot output.  
+
+To create the histogram, we will use the plot_ly function, specifying the dataframe (persdata), the x variable (Age), and the type of plot to render (histogram).
+
+```{r}
+server <- function(input, output) {
+  
+output$ageHist <- renderPlotly({
+    
+    # Read in Personal Data
+    persdata <- read.csv("PersonalData.csv")
+    
+    # Create Histogram displaying employee Age
+    plot_ly(data = persdata, x = ~Age, type = "histogram")})
+}
+
+```
+
+Note: you must include the tilde operator (~) in front of variables within the plot_ly function.  
+
+### Plotly Histogram: Survey Scale Scores
+
+We can also visualize survey responses using histograms. To do so, we will read in the csv files SurveyData.csv and PerformanceData.csv, merge the files, and create scale scores for Job Satisfaction, Engagement, and Turnover Intention items. We can perform all of these operations within the renderPlotly function, just as we did with ageHist above. However, because we are creating three different scale scores, it makes more sense to read in the csv file under the general server function, rather than within each histogram output.    
+  
+Because we will be housing these plots in a **tabbed box**, let's first take a look at the server scripts for these histograms. We'll then look at the ui script and go over how to set up a tabbed box.  
+
+The following is the server script for the JS, ENG, and TI scale scores and their respective plot outputs:    
+
+```{r}
+server <- function(input, output) {
+  
+  # Read in SurveyData.csv and PerformanceData.csv 
+  surveydata <- read.csv("SurveyData.csv")
+  pmdata <- read.csv("PerformanceData.csv")
+  
+  # Merge surveydata and pmdata
+  mergeddata <- merge(surveydata, pmdata, by = c("EmployeeID"), all.x = TRUE)
+  
+  # Job Satisfaction Scale Score Histogram
+  output$JSPlot <- renderPlotly({
+    
+    # Create JS Scale Score
+    mergeddata$JS_Scale <- rowMeans(mergeddata[,c("JobSat1", "JobSat2", 
+                                                  "JobSat3")], na.rm = TRUE)
+    
+    # Create JSPlot
+    plot_ly(data = mergeddata, x = ~JS_Scale, type = "histogram")})
+  
+  # Engagement Scale Score Histogram
+  output$ENGPlot <- renderPlotly({
+    
+    # Create ENG Scale Score
+    mergeddata$ENG_Scale <- rowMeans(mergeddata[,c("Engage2", "Engage3")], na.rm = TRUE)
+    
+    # Create ENGPlot
+    plot_ly(data = mergeddata, x = ~ENG_Scale, type = "histogram")})
+  
+  # Turnover Intentions Scale Score Histogram
+  output$TIPlot <- renderPlotly({
+    
+    # Create TI Scale Score
+    mergeddata$TI_Scale <- rowMeans(mergeddata[,c("TurnoverInt1", "TurnoverInt2",
+                                                  "TurnoverInt3")], na.rm = TRUE)
+    
+    # Create TIPlot
+    plot_ly(data = mergeddata, x = ~TI_Scale, type = "histogram")})
+  
+}
+```
+
+To display these outputs in a more organized manner, we'll create a tabbed box. This is a useful way to store multiple outputs within one contained space. To view one of the outputs, the user simply selects a tab, and the corresponding output is displayed.  
+  
+The following is the ui script for the above plots, contained within a tabbed box:  
+
+```{r}
+ui <- dashboardPage(skin = "blue",
+                    dashboardHeader(),
+                    dashboardSidebar(),
+                    dashboardBody(
+                      tabItems(
+                        tabItem(
+                          tabName = "Home",
+                          h2("Home"),
+                          fluidRow(
+                            box("Employee Age Distribution", width = 6,
+                                plotlyOutput("ageHist", height = 250, width = 500)),
+                            box("Employee Race Composition", width = 6)),
+                          fluidRow(
+                            h3("Employee Survey Results"),
+                            tabBox(id = "SurveyPlots",
+                                   selected = "Job Satisfaction",
+                                   width = 10, side = "right",
+                                   tabPanel("Job Satisfaction",
+                                            plotlyOutput("JSPlot",
+                                                         height = 250, 
+                                                         width = 500)),
+                                   tabPanel("Employee Engagement",
+                                            plotlyOutput("ENGPlot",
+                                                         height = 250,
+                                                         width = 500)),
+                                   tabPanel("Turnover Intentions",
+                                            plotlyOutput("TIPlot",
+                                                         height = 250,
+                                                         width = 500))
+                          )
+                        )
+                      )
+                    )
+                    )
+)
+```
+  
+Let's go over the individual functions of a tabbed box:  
+  
+* tabBox(): this function houses the different tab panels and their respective outputs (in this case, separate plots). Note that you can set which tab is selected by specifying within the 'selected = ' argument. Note also that you can adjust the width of the box, using width = . Finally, you can also specify on which side of the box the tabs will appear, using the 'side = ' argument ("left" or "right").  
+
+* tabPanel(): this function houses the separate outputs in distinct tabs. First, we specify the name of the tabPanel within double quotes (reference this name to specify which tabPanel you would like to be automatically selected for the user). Next, we specify the output. In this case, the output is a plotlyOutput, which we rendered in the server script using the renderPlotly({}) function.  
+  
+* plotlyOutput(): this function produces a plotly output. Specify the plot's name (referenced in the server script with 'output$ ') as well as height and width preferences.
+
+### Plotly Bar Plots  
+
+Let's now construct a bar plot using the plotly package. This bar plot will visualize the difference between pre- and post-test training scores with a control group, and thus relies on the csv file TrainingData.csv.
+
+#### ui Script
+
+```{r}
+ui <- dashboardPage(skin = "blue",
+                    dashboardHeader(),
+                    dashboardSidebar(),
+                    dashboardBody(
+                      tabItem(tabName = "Training",
+                              h2("Training"),
+                              fluidRow(
+                                h3("Training: Old vs New"),
+                                plotlyOutput("Tplot", height = 250)))
+                    ))
+```
+
+The ui script for this bar plot is quite simple. Note the name of the bar plot "Tplot", which will be referenced in the server script. 
+
+#### server Script
+
+```{r}
+server <- function(input, output) {
+  output$Tplot <- renderPlotly({
+    
+    # Read in Training Data
+    tdata <- read.csv("TrainingData.csv")
+    
+    # Create Difference Variable
+    tdata$Difference = tdata$PostTest - tdata$PreTest
+    
+    means <- tapply(tdata$Difference, tdata$Group, mean)
+    
+    plot_ly(data = tdata, x = ~Group, y = ~Difference, type = "bar")})
+}
+```
+
+To visualize this bar plot, we first had to read in the necessary csv file (TrainingData.csv), create a difference score variable (pre- vs post-test scores), and apply the means function based on membership in the New or Old training condition. 
+
+Note the different aspects of this plotly output, as compared with the histogram. Here, we specify the dataframe (tdata), x and y variables (Group and Difference, respectively), and the type of plot (bar). 
+
+### Plotly Scatter Plots  
+
+Now let's visualize the relationships between the survey scale scores we created and sales performance. To do this, we will create three separate scatter plots. Since we already merged surveydata and pmdata, we can easily create these plots. We will again house these plots in a tabbed box to keep the dashboard's body organized and easy to navigate.   
+
+#### ui Script  
+
+First, let's take a look at te ui script for the Sales and survey scale score scatter plots. Recall that we are housing these plots in another tabbed box. We will put this tabbed box in the Performance Management tab.  
+
+```{r}
+ui <- dashboardPage(skin = "blue",
+                    dahboardHeader(),
+                    dashboardSidebar(),
+                    dashboardBody(
+                      tabItems(
+                        tabItem(
+                          tabName = "PM",
+                          h2("Performance Management"),
+                          fluidRow(
+                            h3("Sales and Survey Results"),
+                            tabBox(id = "ScatterPlots",
+                                   width = 10, side = "right",
+                                   tabPanel(title = "Sales and Job Satisfaction",
+                                            plotlyOutput("JSScatter", 
+                                                         height = 250, 
+                                                         width = 500)),
+                                   tabPanel(title = "Sales and Engagement",
+                                            plotlyOutput("ENGScatter", 
+                                                         height = 250, 
+                                                         width = 500)),
+                                   tabPanel(title = "Sales and Turnover Intentions",
+                                            plotlyOutput("TIScatter",
+                                                         height = 250,
+                                                         width = 500))))))))
+```
+
+Note that the above script is essentially the same as the script we wrote to produce the previous tabbed box. We simply specify different titles and plotly outputs. Now let's look at the server script for these plots.  
+
+#### server Script  
+
+```{r}
+server <- function(input, output) {
+  # Read in SurveyData.csv and PerformanceData.csv
+  surveydata <- read.csv("SurveyData.csv")
+  pmdata <- read.csv("PerformanceData.csv")
+  
+  # Merge surveydata and pmdata
+  mergeddata <- merge(surveydata, pmdata, by = c("EmployeeID"), all.x = TRUE)
+  
+  # Create Sales-Job Satisfaction Scatter Plot
+  
+  output$JSScatter <- renderPlotly({
+    
+    # Create JS Scale Score
+    mergeddata$JS_Scale <- rowMeans(mergeddata[,c("JobSat1", "JobSat2", 
+                                                  "JobSat3")], na.rm = TRUE)
+    
+    # Create Sales-JS_Scale Scatter Plot
+    plot_ly(data = mergeddata, x = ~JS_Scale, y = ~Sales, type = "scatter")})
+  
+  # Create Sales-Engagement Scatter Plot
+  output$ENGScatter <- renderPlotly({
+    
+    # Create ENG Scale Score
+    mergeddata$ENG_Scale <- rowMeans(mergeddata[,c("Engage2", "Engage3")], na.rm = TRUE)
+    
+    # Create Sales-ENG_Scale Scatter Plot
+    plot_ly(data = mergeddata, x = ~ENG_Scale, y = ~ Sales, type = "scatter")})
+ 
+  # Create Sales-Turnover Intentions Scatter Plot 
+  output$TIScatter <- renderPlotly({
+    
+    # Create TI Scale Score
+    mergeddata$TI_Scale <- rowMeans(mergeddata[,c("TurnoverInt1", "TurnoverInt2",
+                                                  "TurnoverInt3")], na.rm = TRUE)
+    
+    # Create Sales-TI_Scale Scatter Plot
+    plot_ly(data = mergeddata, x = ~TI_Scale, y = ~Sales, type = "scatter")})
+}
+```
+
+These plot outputs should look quite similar to the plot outputs created earlier. However, in this example we specify x and y variables and indicate the type of plot as "scatter".  

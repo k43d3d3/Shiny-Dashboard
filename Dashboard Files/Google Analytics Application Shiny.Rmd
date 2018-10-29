@@ -1,0 +1,243 @@
+---
+title: "Google Analytics Application Shiny"
+output: html_document
+runtime: shiny
+---
+
+```{r "setup", include=FALSE}
+require("knitr")
+opts_knit$set(root.dir = "~/R Files")
+```
+
+## Introduction
+
+The purpose of this exercise is to interactively query the Google Analytics API. 
+
+Shiny Applications are written using two scripts that reference one another. These two scripts are **user interface (UI)** and **server scripts**. Though separate, these scripts are kept in the same folder and contain complementary information. 
+
+First, install and access the Google Analytics package in R. 
+
+```{r, eval=FALSE}
+install.packages("googleAnalyticsR")
+```
+```{r}
+library(googleAnalyticsR)
+```
+
+Next, read in and name the data. For this example, we are using sample data from a website.  
+
+```{r}
+GAdf <- read.csv("GoogleAnalyticsdf") 
+```
+
+
+## The UI Script
+
+First, it is necessary to install and access the rgdal package. This package allows us to select a **date** and **time range** and view a resulting text summary or plot as an output.
+
+The following is the ui script for the Google Analytics Application:
+
+```{r}
+# Always remember to access the shiny package.
+library(shiny)
+
+# The following section is concerned with inputs. 
+shinyUI(fluidPage(
+  titlePanel("Google Analytics"),
+  sidebarLayout(
+    sidebarPanel(
+      dateRangeInput(inputId = "dateRange", label = "Date range", 
+                     start = "2013-05-01"),
+
+checkboxGroupInput(inputId = "domainShow",
+                         label = "Show NHS and other domain
+                                (defaults to all)?",
+                         choices = list("NHS users" = "nhs.uk",
+                                        "Other" = "Other"),
+                         selected = c("nhs.uk", "Other")),
+      hr(),
+
+radioButtons(inputId = "outputRequired", label = "Output required", 
+                   choices = list("Average session" = "meanSession", 
+                                  "Users" = "users", "Sessions" = "sessions")),
+
+checkboxInput("smooth", label = "Add smoother?", value = FALSE)),
+
+# The second section of the ui script lays out the output panel.
+mainPanel(
+      tabsetPanel( 
+        tabPanel("Summary", textOutput("textDisplay")),
+        tabPanel("Trend", plotOutput("trend")),
+        tabPanel("Map", plotOutput("ggplotMap"))
+      )
+    )
+  )
+))
+```
+
+Note the meaning of the above functions/elements:
+
+Function/Element         | Use
+------------------------ | --------------------------------------------------------------------
+**titlePanel()**         | gives the application a title   
+**sidebarLayout()**      | builds a simple setup (controls on left; output on right)
+**sidebarPanel()**       | configures sidebar layout
+**dateRangeInput()**     | provides start- and end-date widgets 
+**checkboxGroupInput()** | allows user to select from a number of tick boxes  
+**radioButtons()**       | provides radio buttons, allowing for the selection of only one option
+**checkboxInput()**      | gives a tick box that reads TRUE when selected and FALSE when unselected 
+**mainPanel()**          | configures the main panel section
+**tabsetPanel()**        | sets up a tabbed output 
+
+(Note: leaving the end-date blank in the dateRangeInput() function will default to today's date, as shown in this example.)  
+
+## The Server Script
+
+Several packages are needed to complete the server.R script. These include:
+
+Function/Element         | Use
+------------------------ | --------------------------------------------------------------------
+**dplyr**                | filter() command; chained instructions
+**ggplot2**              | build ggplot objects
+**rgdal**                | selection of date and time ranges and output of text or plot
+**RColorBrewer**         | pcolor palettes for thematic maps 
+
+```{r, eval=FALSE}
+# Install the dplyr, ggplot2, rgdal and RColorBrewer packages. 
+install.packages("dplyr")
+install.packages("ggplot2")
+install.packages("rgdal")
+install.packages("RColorBrewer")
+```
+```{r}
+# Access the dplyr, ggplot2, rgdal, shiny and RColorBrewer packages. 
+library(dplyr)
+library(ggplot2)
+library(rgdal)
+library(shiny)
+library(RColorBrewer)
+
+# Build the Reactive Objects.
+
+shinyServer(function(input, output) {
+  
+  load("gadf.Rdata")
+
+  passData <- reactive({
+    
+    firstData <- filter(gadf, date >= input$dateRange[1] & date <= input$dateRange[2])
+    
+    if(!is.null(input$domainShow)){
+      
+      firstData <- filter(firstData, networkDomain %in% input$domainShow)
+      
+    }
+    
+    return(firstData)
+    
+  })
+ 
+  if(!is.null(input$domainShow)){
+      
+      firstData <- filter(firstData, networkDomain %in% input$domainShow)
+      
+  }
+
+  return(firstData)
+    
+  })
+
+# Build the Outputs 
+
+## The first tab of output is the Text Output (text summary of the data).
+
+output$textDisplay <- renderText({
+    paste(
+      length(seq.Date(input$dateRange[1], input$dateRange[2], by = "days")),
+      " days are summarised. There were", sum(passData()$users),
+      "users in this time period."
+    )
+  })
+
+## The next tab of output contains Trend Graphs (specifies trend graph in specified varaible).
+
+output$trend <- renderPlot({
+    
+    groupByDate <- group_by(passData(), YearMonth, networkDomain) %>%
+      summarise(meanSession = mean(sessionDuration, na.rm = TRUE), 
+                users = sum(users),
+                newUsers = sum(newUsers), sessions = sum(sessions))
+    
+    groupByDate$Date <- as.Date(paste0(groupByDate$YearMonth, "01"), format = "%Y%m%d")
+    
+    thePlot <- ggplot(groupByDate, 
+                      aes_string(x = "Date", y = input$outputRequired, 
+                                 group = "networkDomain", colour = "networkDomain")) +
+      geom_line()
+
+    if(input$smooth){
+      
+      thePlot <- thePlot + geom_smooth()
+    }
+    
+    print(thePlot)
+    
+  })
+
+## The final tab of output: Choropleth Map 
+
+output$ggplotMap <- renderPlot ({
+    
+    groupCountry <- group_by(passData(), country)
+    
+    groupByCountry <- summarise(groupCountry, meanSession = mean(sessionDuration), 
+                                users = log(sum(users)), sessions = log(sum(sessions)))
+
+### Merge data with objects to link the map and variables of interest 
+    
+    world <- readOGR(dsn=".", layer="world_country_admin_boundary_shapefile_with_fips_codes")
+    
+    countries <- world@data
+    
+    countries <- cbind(id = rownames(countries), countries)
+    
+    countries <- merge(countries, groupByCountry, by.x = "CNTRY_NAME", by.y = "country", all.x = TRUE)
+    
+    map.df <- fortify(world)
+    
+    map.df <- merge(map.df, countries, by = "id")
+    
+    ggplot(map.df, aes(x = long, y = lat, group = group)) +
+      geom_polygon(aes_string(fill = input$outputRequired)) +
+      geom_path(colour = "grey50") +
+      scale_fill_gradientn(colours = rev(brewer.pal(9, "Spectral")),
+                           na.value = "white") +
+      coord_fixed() + labs(x = "", y = "")
+    
+  })
+```
+
+Note the meanings of the above functions/elements:
+
+Function/Element                        | Use
+--------------------------------------  | ----------------------------------------------------------------------------
+**load()**                              | where data preparation takes place
+**reactive({...})**                     | marks whatever contained inside it as reactive; generates a **reactive object** 
+**filter(gadf ...)**                    | filters data by the dates that the user is interested in using 
+**if(!is.null(...))**                   | returns NULL when a group of checkboxes has no return values; ensures that only checkboxes that are selected are included in the filter 
+**{filter(firstData ...)}**             | filters data using specified, within-function network domains 
+**return(firstData)**                   | returns a value from a function and closes the function
+**length()**                            | finds the length between specified vector of dates as specified in the ui.R script
+**seq.Date(...)**                       | generates regular sequence(s) of dates
+**output$trend <- renderPlot({...})**   | defines output as a **reactive plot**
+**groupbyDate <- group_by()**           | groups by variables 
+**summarise()**                         | produces summarized session durations, users and new users, grouped according to the                                              | desired groupings (in this case, month/year and network domain groupings)
+**groupByDate <- as.date()**            | creates a date from the YearMonth variable; adds "01" to end of variable; converts to R Date format
+**thePlot <- ggplot()**                 | main setup of plot 
+**aes_string()**                        | allows passage of string(s) from variable(s) straight into ggplot (in this case, from input$outputsRequired)
+**if(input$smooth){...}**               | tests value of smoothing checkbox and adds a smoothing line if TRUE value is returned 
+**print()**                             | prints the plot 
+**output$ggplotMap <- renderPlot({})**  | sets up a *reactive plot**
+**log()**                               | logs variables; compresses the scale and enhances readabiliy 
+**world <- readOGR(...)**               | carries out processing of map 
+**ggplot()**                            | builds a ggplot object

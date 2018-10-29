@@ -1,0 +1,14 @@
+---
+title: Shiny using R Markdown Demo
+author: 
+output: html_document
+runtime: shiny
+---
+
+## BUilding an Interactive Histogram 
+
+``` {r, echo = FALSE}
+sliderInput("sampleSize", label = "Size of sample", 
+            min = 10, max = 100, value = 50, step = 1)
+renderPlot({hist(runif(input$sampleSize))})
+```

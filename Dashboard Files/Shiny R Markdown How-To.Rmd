@@ -1,0 +1,41 @@
+---
+title: Shiny Using R Markdown Intro
+author: 
+output: html_document
+runtime: shiny
+---
+
+## Building an Interactive Histogram
+
+### Step 1. Open a new R Script. Save this R SCript as a .Rmd file. 
+
+### Step 2. Format as RMarkdown document. 
+
+The following six lines should precede the rest of the text in the RMarkdown document. (In other words, copy and paste the first six lines of this document.)
+
+Be sure to specify the document's runtime as shiny, as this signals R to download the necessary packages. 
+
+### Step 3. Knit the document. 
+
+To knit the document, press Ctrl + Shift + K. Knitting the document will cause another window to open. This window will contain the title and author information as input at the beginning of the document. Close this extra window. 
+
+### Step 4. Enter code chunk(s).
+
+Following is an interactive, reactive histogram: 
+
+``` {r, echo = FALSE}
+sliderInput("sampleSize", label = "Size of sample", 
+            min = 10, max = 100, value = 50, step = 1)
+renderPlot({hist(runif(input$sampleSize))})
+```
+
+**sliderInput():** (input code) Defines an input widget and allows users to select from a range of values.   
+**renderPlot():** (output code) Produces a reactive plot by utilizing the functions within it.   
+**hist():** Builds a histogram.  
+**runif():** produces random numbers, given a quantity argument. (In this case, the argument is input$sampleSize). 
+
+### Step 5. Knit the document.
+
+To knit the document, press Ctrl + Shift + K. Again, knitting the document will prompt a separate window to appear. This window will contain the interactive histogram.
+
+
